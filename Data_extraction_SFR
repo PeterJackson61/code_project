@@ -1,0 +1,109 @@
+import pandas as pd
+import os 
+import time 
+import datetime
+raw_inf = [raw for raw in os.listdir('./data_raw') if 'Infinity' in raw]
+raw_med = [raw for raw in os.listdir('./data_raw') if 'Median' in raw]
+raw_mac= [raw for raw in os.listdir('./data_raw') if 'Macro' in raw]
+
+start_1 = time.time()
+
+def date_writing():
+    tday = datetime.date.today()
+    daytoday = tday.ctime()
+    return daytoday[4:10]
+
+def concat(list_file):
+    df_temp = pd.DataFrame()
+    for file in list_file:
+        if file != None:
+            df = pd.read_csv(f'./data_raw/{file}')
+            df_temp = pd.concat([df_temp,df])
+    return df_temp
+def Preprocessing(df_):
+    start = time.time()
+    if df_.empty:
+        pass
+    else: 
+        df_ = df_[df_['time']!='time']
+        df_ = df_.sort_values(by = 'time', ascending = False)
+        df_ = df_.drop_duplicates(subset = ['barcode'])
+        df_ = df_.fillna('')
+    print(f'[>] Preprocessing in {time.time() - start:.2f}')
+    return df_
+# def fit(df_,dict):
+#     df_.replace({'config':dict})
+    # return df_
+def get_att(df_):
+    if df_.empty :
+        pass
+    else:
+        dict_config = {'842':'SC_S','839':'SC_B','840': 'SC_Q'}
+        dict_lens = {'4':'G','1':'L'}
+        dict_vcm = {'L':'I','A':'A'}
+        # df_['config'] = df_['lotNum'].str[3:6].map(dict_config)
+    # df_['rename'] = df_['config'].apply(lambda x: fit(x,dict_config))
+    # df_.replace({'config':dict_config})
+        # df_['config_name'] = df_['config'].map(dict_config)
+        # df_['lens_extract'] = df_['LensSN'].str[4].map(dict_lens)
+        # df_['lensVD'] = df_['lens_extract'].map(dict_lens)
+        # df_['vcm_extract'] = df_['vcmID'].str[0].map(dict_vcm)
+        # df_['vcmVD'] = df_['vcm_extract'].map(dict_vcm)
+        df_['attribute'] = df_['lotNum'].str[3:6].map(dict_config) + ' ' + df_['vcmID'].str[0].map(dict_vcm) + df_['LensSN'].str[4].map(dict_lens)
+        # print(df_[['lotNum','config','rename']])
+        return df_
+
+def get_bc(df_):
+    start_2 = time.time()
+    if df_.empty:
+        pass
+    else: 
+        df_ = df_.fillna('')
+        df_ = df_[df_['time']!='time']
+        df_ = df_.sort_values(by = 'time', ascending = False)
+        df_ = df_[df_['fail_items'].str.contains('sfr_circle')]
+        # df_ = df_.drop_duplicates(subset = ['barcode'])
+    print(f'[>] Get bc in {time.time() - start_2:.2f}')
+    return df_
+def Pivot(df_):
+    try:
+        PV = df_.pivot_table(index = ['fail_items'], values = ['barcode'], columns = 'attribute', aggfunc= 'count')
+        return PV
+    except:
+        return pd.DataFrame()
+# data_up = pd.read_csv(f'./data_raw/{raw_up}')
+# data_down = pd.read_csv(f'./data_raw/{raw_down}')
+def return_res(list_df):
+    if list_df == None:
+        return pd.DataFrame()
+    else:
+        return Pivot(get_att(Preprocessing(concat(list_df))))
+
+# def return_bc(list_df):
+#     if list_df == None:
+#         return pd.DataFrame()
+#     else:
+#         return Pivot(get_att(Preprocessing(concat(list_df))))
+# res_inf = Pivot(get_att(Preprocessing(concat(raw_inf))))
+# # print(res_up[['config_name','lotNum','LensSN','lensVD','vcmID','vcmVD','attribute']])
+# res_med = Pivot(get_att(Preprocessing(concat(raw_med))))
+# res_mac = Pivot(get_att(Preprocessing(concat(raw_mac))))
+
+res_inf = return_res(raw_inf)
+res_med = return_res(raw_med)
+res_mac = return_res(raw_mac)
+
+res_bc_inf = get_bc(concat(raw_inf))
+res_bc_med = get_bc(concat(raw_med))
+res_bc_mac = get_bc(concat(raw_mac))
+res_inf.to_csv(f'./output/RES_inf{date_writing()}.csv')
+# print(res_up)
+res_mac.to_csv(f'./output/RES_mac_{date_writing()}.csv')
+res_med.to_csv(f'./output/RES_med_{date_writing()}.csv')
+# date_writing()
+res_bc_inf.to_csv(f'./barcode inspect/RES_barcode_inf{date_writing()}.csv')
+# print(res_up)
+res_bc_mac.to_csv(f'./barcode inspect/RES_barcode_mac_{date_writing()}.csv')
+res_bc_med.to_csv(f'./barcode inspect/RES_barcode_med_{date_writing()}.csv')
+
+print(f'[>]Finishing in {time.time() - start_1:.2f}')
